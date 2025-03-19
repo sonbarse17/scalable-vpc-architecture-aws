@@ -273,9 +273,17 @@ TGW_ID=$(aws ec2 create-transit-gateway \
   --query TransitGateway.TransitGatewayId \
   --output text)
 
-# Wait for Transit Gateway to be available
-echo "Waiting for Transit Gateway to be available..."
-aws ec2 wait transit-gateway-available --transit-gateway-ids $TGW_ID
+# Wait until the Transit Gateway is available
+while true; do
+  STATE=$(aws ec2 describe-transit-gateways --transit-gateway-ids $TGW_ID --query 'TransitGateways[0].State' --output text)
+  if [ "$STATE" == "available" ]; then
+    echo "Transit Gateway is now available."
+    break
+  else
+    echo "Transit Gateway state: $STATE. Waiting..."
+    sleep 10
+  fi
+done
 
 # Create Transit Gateway attachment for VPC 1
 TGW_ATTACH1_ID=$(aws ec2 create-transit-gateway-vpc-attachment \
