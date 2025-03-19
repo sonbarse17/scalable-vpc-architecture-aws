@@ -303,8 +303,47 @@ TGW_ATTACH2_ID=$(aws ec2 create-transit-gateway-vpc-attachment \
 
 # Wait for attachments to be available
 echo "Waiting for Transit Gateway attachments to be available..."
-aws ec2 wait transit-gateway-attachment-available --transit-gateway-attachment-ids $TGW_ATTACH1_ID
-aws ec2 wait transit-gateway-attachment-available --transit-gateway-attachment-ids $TGW_ATTACH2_ID
+
+
+# Wait until the Transit Gateway attachment is available
+TGW_ATTACH1_ID="tgw-attach-061f15f8d72f9e2c9"  # Replace with your actual Transit Gateway Attachment ID
+while true; do
+  STATE=$(aws ec2 describe-transit-gateway-attachments \
+    --transit-gateway-attachment-ids $TGW_ATTACH1_ID \
+    --query 'TransitGatewayAttachments[0].State' \
+    --output text)
+
+  if [ "$STATE" == "available" ]; then
+    echo "Transit Gateway Attachment is now available."
+    break
+  elif [ "$STATE" == "failed" ] || [ "$STATE" == "deleted" ]; then
+    echo "Transit Gateway Attachment is in a failed or deleted state. Exiting."
+    exit 1
+  else
+    echo "Transit Gateway Attachment state: $STATE. Waiting..."
+    sleep 10
+  fi
+done
+
+
+TGW_ATTACH2_ID="tgw-attach-0e70e70c6db7e372c"  # Replace with your actual Transit Gateway Attachment ID
+while true; do
+  STATE=$(aws ec2 describe-transit-gateway-attachments \
+    --transit-gateway-attachment-ids $TGW_ATTACH2_ID \
+    --query 'TransitGatewayAttachments[0].State' \
+    --output text)
+
+  if [ "$STATE" == "available" ]; then
+    echo "Transit Gateway Attachment is now available."
+    break
+  elif [ "$STATE" == "failed" ] || [ "$STATE" == "deleted" ]; then
+    echo "Transit Gateway Attachment is in a failed or deleted state. Exiting."
+    exit 1
+  else
+    echo "Transit Gateway Attachment state: $STATE. Waiting..."
+    sleep 10
+  fi
+done
 
 # Get Transit Gateway Route Table ID
 TGW_RT_ID=$(aws ec2 describe-transit-gateway-route-tables \
