@@ -425,7 +425,7 @@ aws ec2 create-flow-logs \
   --resource-ids $VPC1_ID \
   --traffic-type ALL \
   --log-destination-type cloud-watch-logs \
-  --log-destination "arn:aws:logs:$(aws configure get region)::log-group:/aws/vpc/flowlogs:log-stream:bastion-vpc-flowlogs" \
+  --log-destination "arn:aws:logs:$(aws configure get region):$(aws sts get-caller-identity --query Account --output text):log-group:/aws/vpc/flowlogs" \
   --deliver-logs-permission-arn $FLOW_LOGS_ROLE_ARN
 
 # Enable Flow Logs for VPC 2
@@ -434,7 +434,7 @@ aws ec2 create-flow-logs \
   --resource-ids $VPC2_ID \
   --traffic-type ALL \
   --log-destination-type cloud-watch-logs \
-  --log-destination "arn:aws:logs:$(aws configure get region)::log-group:/aws/vpc/flowlogs:log-stream:app-vpc-flowlogs" \
+  --log-destination "arn:aws:logs:$(aws configure get region):$(aws sts get-caller-identity --query Account --output text):log-group:/aws/vpc/flowlogs" \
   --deliver-logs-permission-arn $FLOW_LOGS_ROLE_ARN
 ```
 
@@ -472,11 +472,12 @@ aws ec2 authorize-security-group-ingress \
   --cidr 0.0.0.0/0
 
 # Allow SSH access only from Bastion Host to Web Servers
+BASTION_VPC_CIDR="192.168.0.0/16"    #Enter the CIDR block of the Bastion Host VPC
 aws ec2 authorize-security-group-ingress \
   --group-id $WEBSERVER_SG_ID \
   --protocol tcp \
   --port 22 \
-  --source-group $BASTION_SG_ID
+  --cidr "$BASTION_VPC_CIDR"
 ```
 
 ## Step 6: Deploy Bastion Host
@@ -492,13 +493,14 @@ chmod 400 bastion-key.pem
 
 # Launch Bastion Host
 BASTION_INSTANCE_ID=$(aws ec2 run-instances \
-  --image-id ami-0c55b159cbfafe1f0 \  # Replace with appropriate Amazon Linux 2 AMI ID
+  --image-id ami-08b5b3a93ed654d19 \
   --instance-type t2.micro \
   --key-name "bastion-key" \
   --security-group-ids $BASTION_SG_ID \
   --subnet-id $PUBLIC_SUBNET1_ID \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Bastion-Host}]' \
-  --query "Instances[0].InstanceId" --output text)
+  --query "Instances[0].InstanceId" \
+  --output text)
 
 # Allocate and associate Elastic IP for Bastion Host
 BASTION_EIP_ID=$(aws ec2 allocate-address \
