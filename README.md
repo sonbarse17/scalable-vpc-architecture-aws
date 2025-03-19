@@ -268,13 +268,10 @@ aws ec2 associate-route-table --route-table-id $PRIVATE_RT2_ID --subnet-id $PRIV
 ```bash
 # Create Transit Gateway
 TGW_ID=$(aws ec2 create-transit-gateway \
-  --description "Transit Gateway connecting VPCs" \
   --tag-specifications 'ResourceType=transit-gateway,Tags=[{Key=Name,Value=Multi-VPC-TGW}]' \
-  --amazon-side-asn 64512 \
-  --auto-accept-shared-attachments enable \
-  --default-route-table-association enable \
-  --default-route-table-propagation enable \
-  --query TransitGateway.TransitGatewayId --output text)
+  --options "AmazonSideAsn=64512,AutoAcceptSharedAttachments=enable,DefaultRouteTableAssociation=enable,DefaultRouteTablePropagation=enable" \
+  --query TransitGateway.TransitGatewayId \
+  --output text)
 
 # Wait for Transit Gateway to be available
 echo "Waiting for Transit Gateway to be available..."
