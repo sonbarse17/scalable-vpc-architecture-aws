@@ -94,7 +94,8 @@ sudo yum install -y git
 sudo yum install -y amazon-cloudwatch-agent
 
 # Configure CloudWatch Agent for custom memory metrics
-sudo cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'
+# Create a temporary file in your home directory
+cat > /tmp/amazon-cloudwatch-agent.json << 'EOF'
 {
   "metrics": {
     "metrics_collected": {
@@ -108,6 +109,11 @@ sudo cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 
   }
 }
 EOF
+
+# Then use sudo to copy it to the destination
+sudo cp /tmp/amazon-cloudwatch-agent.json /opt/aws/amazon-cloudwatch-agent/etc/
+
+sudo systemctl restart amazon-cloudwatch-agent
 
 # Start CloudWatch Agent
 sudo systemctl enable amazon-cloudwatch-agent
