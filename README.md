@@ -494,15 +494,16 @@ aws ec2 create-key-pair \
 chmod 400 bastion-key.pem
 
 # Launch Bastion Host
-BASTION_INSTANCE_ID=$(aws ec2 run-instances \
+aws ec2 run-instances \
   --image-id ami-08b5b3a93ed654d19 \
   --instance-type t2.micro \
   --key-name "bastion-key" \
-  --security-group-ids $BASTION_SG_ID \
-  --subnet-id $PUBLIC_SUBNET1_ID \
+  --security-group-ids "$BASTION_SG_ID" \
+  --subnet-id "$PUBLIC_SUBNET1_ID" \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Bastion-Host}]' \
   --query "Instances[0].InstanceId" \
-  --output text)
+  --output text
+
 
 # Allocate and associate Elastic IP for Bastion Host
 BASTION_EIP_ID=$(aws ec2 allocate-address \
@@ -530,8 +531,7 @@ S3_BUCKET_NAME="webapp-config-$(date +%s)"
 # Create S3 bucket
 aws s3api create-bucket \
   --bucket $S3_BUCKET_NAME \
-  --region $(aws configure get region) \
-  --create-bucket-configuration LocationConstraint=$(aws configure get region)
+  --region $(aws configure get region) \   # IF it doesn't work please replace with project region ex. us-east-1
 
 # Enable server-side encryption
 aws s3api put-bucket-encryption \
