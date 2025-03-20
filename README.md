@@ -663,14 +663,27 @@ EOF
 # Create Launch Configuration
 GOLDEN_AMI_ID="ami-xxxxxxxxxxxxxxxxx"  # Replace with your Golden AMI ID
 
-aws autoscaling create-launch-configuration \
-  --launch-configuration-name "WebApp-LC" \
-  --image-id $GOLDEN_AMI_ID \
-  --key-name "bastion-key" \
-  --security-groups $WEBSERVER_SG_ID \
-  --instance-type t2.micro \
-  --iam-instance-profile $WEBAPP_ROLE_NAME \
-  --user-data file://userdata.sh
+#Create Launch Template of the Golden AMI
+aws ec2 create-launch-template \
+  --launch-template-name "WebApp-LT" \
+  --version-description "Initial version" \
+  --launch-template-data "{
+    \"ImageId\": \"$GOLDEN_AMI_ID\",
+    \"InstanceType\": \"t2.micro\",
+    \"KeyName\": \"bastion-key\",
+    \"SecurityGroupIds\": [\"$WEBSERVER_SG_ID\"],
+    \"IamInstanceProfile\": { \"Name\": \"$WEBAPP_ROLE_NAME\" },
+    \"UserData\": \"$(base64 -w0 userdata.sh)\"
+  }"
+
+
+aws autoscaling create-auto-scaling-group \
+  --auto-scaling-group-name "WebApp-ASG" \
+  --launch-template "LaunchTemplateName=WebApp-LT,Version=1" \
+  --min-size 1 \
+  --max-size 3 \
+  --desired-capacity 2 \
+  --vpc-zone-identifier "$PRIVATE_SUBNET2A_ID,$PRIVATE_SUBNET2B_ID"
 ```
 
 ## Step 10: Create Target Group and Network Load Balancer
