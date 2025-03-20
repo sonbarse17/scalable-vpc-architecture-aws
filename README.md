@@ -304,6 +304,8 @@ TGW_ATTACH2_ID=$(aws ec2 create-transit-gateway-vpc-attachment \
 # Wait for attachments to be available
 echo "Waiting for Transit Gateway attachments to be available..."
 
+# To Get the Transit Gateway attachment Id
+aws ec2 describe-transit-gateway-attachments
 
 # Wait until the Transit Gateway attachment is available
 TGW_ATTACH1_ID="tgw-attach-061f15f8d72f9e2c9"  # Replace with your actual Transit Gateway Attachment ID
