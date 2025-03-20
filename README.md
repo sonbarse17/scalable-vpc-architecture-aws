@@ -819,6 +819,179 @@ ssh -i bastion-key.pem ec2-user@$BASTION_PUBLIC_IP
 # Replace PRIVATE_IP with the actual private IP of an instance
 ssh -i ~/bastion-key.pem ec2-user@PRIVATE_IP
 ```
+## Step 13: Clean Up Resources
+
+```bash
+# 1. Delete Auto Scaling Group
+aws autoscaling delete-auto-scaling-group \
+  --auto-scaling-group-name "WebApp-ASG" \
+  --force-delete
+
+# 2. Delete Launch Template
+aws ec2 delete-launch-template \
+  --launch-template-name "WebApp-LT"
+
+# 3. Delete Network Load Balancer and Target Group
+aws elbv2 delete-load-balancer \
+  --load-balancer-arn $NLB_ARN
+
+aws elbv2 delete-target-group \
+  --target-group-arn $TG_ARN
+
+# 4. Delete Route53 DNS Record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "DELETE",
+        "ResourceRecordSet": {
+          "Name": "webapp.'$DOMAIN_NAME'",
+          "Type": "CNAME",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "'$NLB_DNS'"
+            }
+          ]
+        }
+      }
+    ]
+  }'
+
+# 5. Delete Bastion Host
+BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=Bastion-Host" \
+  --query "Reservations[0].Instances[0].InstanceId" \
+  --output text)
+
+aws ec2 terminate-instances \
+  --instance-ids $BASTION_INSTANCE_ID
+
+# 6. Release Elastic IPs
+aws ec2 release-address \
+  --allocation-id $BASTION_EIP_ID
+
+aws ec2 release-address \
+  --allocation-id $EIP_ID  # NAT Gateway EIP
+
+# 7. Delete Transit Gateway Attachments
+aws ec2 delete-transit-gateway-vpc-attachment \
+  --transit-gateway-attachment-id $TGW_ATTACH1_ID
+
+aws ec2 delete-transit-gateway-vpc-attachment \
+  --transit-gateway-attachment-id $TGW_ATTACH2_ID
+
+# 8. Wait for Transit Gateway attachments to be deleted
+echo "Waiting for Transit Gateway attachments to be deleted..."
+aws ec2 wait transit-gateway-attachment-deleted \
+  --transit-gateway-attachment-ids $TGW_ATTACH1_ID $TGW_ATTACH2_ID
+
+# 9. Delete Transit Gateway
+aws ec2 delete-transit-gateway \
+  --transit-gateway-id $TGW_ID
+
+# 10. Delete NAT Gateway
+aws ec2 delete-nat-gateway \
+  --nat-gateway-id $NAT_GW_ID
+
+# Wait for NAT Gateway to be deleted
+echo "Waiting for NAT Gateway to be deleted..."
+aws ec2 wait nat-gateway-deleted \
+  --nat-gateway-ids $NAT_GW_ID
+
+# 11. Delete Internet Gateways
+aws ec2 detach-internet-gateway \
+  --internet-gateway-id $IGW1_ID \
+  --vpc-id $VPC1_ID
+
+aws ec2 delete-internet-gateway \
+  --internet-gateway-id $IGW1_ID
+
+aws ec2 detach-internet-gateway \
+  --internet-gateway-id $IGW2_ID \
+  --vpc-id $VPC2_ID
+
+aws ec2 delete-internet-gateway \
+  --internet-gateway-id $IGW2_ID
+
+# 12. Delete Security Groups
+aws ec2 delete-security-group \
+  --group-id $BASTION_SG_ID
+
+aws ec2 delete-security-group \
+  --group-id $WEBSERVER_SG_ID
+
+# 13. Delete VPC Flow Logs
+FLOW_LOG_IDS=$(aws ec2 describe-flow-logs \
+  --filter "Name=resource-id,Values=$VPC1_ID,$VPC2_ID" \
+  --query "FlowLogs[].FlowLogId" \
+  --output text)
+
+for FLOW_LOG_ID in $FLOW_LOG_IDS; do
+  aws ec2 delete-flow-logs --flow-log-ids $FLOW_LOG_ID
+done
+
+# 14. Delete VPCs and their Subnets
+aws ec2 delete-vpc \
+  --vpc-id $VPC1_ID
+
+aws ec2 delete-vpc \
+  --vpc-id $VPC2_ID
+
+# 15. Delete CloudWatch Log Groups
+aws logs delete-log-group \
+  --log-group-name /aws/vpc/flowlogs
+
+# 16. Delete S3 Bucket
+aws s3 rm s3://$S3_BUCKET_NAME --recursive
+aws s3api delete-bucket --bucket $S3_BUCKET_NAME
+
+# 17. Delete IAM Roles and Policies
+aws iam remove-role-from-instance-profile \
+  --instance-profile-name $WEBAPP_ROLE_NAME \
+  --role-name $WEBAPP_ROLE_NAME
+
+aws iam delete-instance-profile \
+  --instance-profile-name $WEBAPP_ROLE_NAME
+
+aws iam detach-role-policy \
+  --role-name $WEBAPP_ROLE_NAME \
+  --policy-arn $WEBAPP_POLICY_ARN
+
+aws iam detach-role-policy \
+  --role-name $WEBAPP_ROLE_NAME \
+  --policy-arn "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+
+aws iam delete-policy \
+  --policy-arn $WEBAPP_POLICY_ARN
+
+aws iam delete-role \
+  --role-name $WEBAPP_ROLE_NAME
+
+aws iam delete-role-policy \
+  --role-name $FLOW_LOGS_ROLE_NAME \
+  --policy-name VPCFlowLogsPolicy
+
+aws iam delete-role \
+  --role-name $FLOW_LOGS_ROLE_NAME
+
+# 18. Delete Key Pair
+aws ec2 delete-key-pair \
+  --key-name "bastion-key"
+
+# 19. Clean up local files
+rm -f bastion-key.pem
+rm -f flowlogs-trust-policy.json
+rm -f flowlogs-permission-policy.json
+rm -f ec2-trust-policy.json
+rm -f webapp-s3-policy.json
+rm -f userdata.sh
+rm -f webapp-config.json
+
+echo "All resources have been deleted successfully."
+```
+
 
 ### Accessing Instances via AWS Session Manager
 
